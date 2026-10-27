@@ -78,6 +78,19 @@ if [[ "${TOUCH_AUTLOGIN_REMOVED:-0}" == "1" ]]; then
     systemctl disable getty@tty2.service
 fi
 
+# Remove the SvxLink-Touch console activation service.
+CONSOLE_SERVICE="/etc/systemd/system/svxlink-touch-console.service"
+
+if [[ -f "$CONSOLE_SERVICE" ]]; then
+    log "Disabling SvxLink-Touch console activation..."
+
+    systemctl disable svxlink-touch-console.service
+
+    rm -f "$CONSOLE_SERVICE"
+
+    log "Removed SvxLink-Touch console activation service."
+fi
+
 systemctl daemon-reload
 
 log "Kiosk integration removed."

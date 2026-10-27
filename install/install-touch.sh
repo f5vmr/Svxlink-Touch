@@ -170,11 +170,20 @@ fi
 log "Validating tty2 configuration..."
 systemd-analyze verify getty@tty2.service
 
+log "Installing SvxLink-Touch console activation service..."
+
+install -o root -g root -m 0644 \
+  "$PROJECT_DIR/services/svxlink-touch-console.service" \
+  /etc/systemd/system/svxlink-touch-console.service
+
 log "Reloading systemd configuration..."
 systemctl daemon-reload
 
 log "Enabling tty2 autologin at boot..."
 systemctl enable getty@tty2.service
+
+log "Enabling automatic console selection..."
+systemctl enable svxlink-touch-console.service
 
 log "Kiosk files installed."
 log "Automatic startup will take effect at the next tty2 login."
