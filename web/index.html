@@ -60,10 +60,19 @@
              alt="SvxLink-Touch">
     </div>
 
-    <main id="main">
-        <h1>SvxLink-Touch</h1>
-        <p>Node status interface — under development</p>
-    </main>
+<main id="main">
+    <h1>SvxLink-Touch</h1>
+
+    <section id="node-status">
+        <h2 id="node-callsign">Connecting...</h2>
+
+        <p>Node: <span id="node-type">—</span></p>
+        <p>Receiver: <span id="node-rx">—</span></p>
+        <p>Transmitter: <span id="node-tx">—</span></p>
+        <p>Reflector: <span id="node-reflector">—</span></p>
+        <p>Talkgroup: <span id="node-talkgroup">—</span></p>
+    </section>
+</main>
 
 <script>
     // SvxLink-Touch inactivity timeout, in minutes.
@@ -85,11 +94,64 @@
         currentPage = "welcome";
     }
 
+// Remote node status — initial V0.4 implementation.
+    async function updateNodeStatus() {
+        try {
+            const response = await fetch("/api/remote-status", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("Remote node unavailable");
+            }
+
+            const result = await response.json();
+
+            if (!result.connected || !result.data?.status) {
+                throw new Error("Invalid remote node response");
+            }
+
+            const status = result.data.status;
+            const radio = status.radio_state || {};
+
+            document.getElementById("node-callsign").textContent =
+                status.callsign || "Unknown";
+
+            document.getElementById("node-type").textContent =
+                status.node_type || "Unknown";
+
+            document.getElementById("node-rx").textContent =
+                radio.rx ? "Active" : "Idle";
+
+            document.getElementById("node-tx").textContent =
+                radio.tx ? "Active" : "Idle";
+
+            document.getElementById("node-reflector").textContent =
+                status.reflector || "Unknown";
+
+            document.getElementById("node-talkgroup").textContent =
+                status.active_talkgroup || "Standby";
+
+        } catch (error) {
+            document.getElementById("node-callsign").textContent =
+                "MB5HT — Offline";
+
+            document.getElementById("node-type").textContent = "—";
+            document.getElementById("node-rx").textContent = "—";
+            document.getElementById("node-tx").textContent = "—";
+            document.getElementById("node-reflector").textContent = "Unavailable";
+            document.getElementById("node-talkgroup").textContent = "—";
+        }
+    }
+
+    // Poll the remote node every five seconds.
+    setInterval(updateNodeStatus, 5000);
+
     function showMain() {
         welcome.style.display = "none";
         main.style.display = "block";
         currentPage = "main";
-
+        updateNodeStatus();
         resetInactivityTimer();
     }
 
