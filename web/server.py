@@ -12,6 +12,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 WEB_ROOT = PROJECT_ROOT / "web"
 ASSETS_ROOT = PROJECT_ROOT / "assets"
 SVXLINK_CONFIG_FILE = Path("/etc/svxlink/svxlink.conf")
+TALKGROUP_FAVOURITES_FILE = Path(
+    "/var/lib/svxlink-touch/talkgroups.json"
+)
 FEDERATION_TG_FILE = (
     PROJECT_ROOT / "config" / "federation_talkgroups.json"
 )
@@ -46,6 +49,55 @@ def load_nodes():
     ]
 # Initial remote node for V0.4 testing.
 REMOTE_NODE_URL = "http://192.168.1.214:5000/api/status"
+
+
+def load_talkgroup_favourites():
+    """Load and validate persistent touchscreen talkgroup favourites."""
+
+    with TALKGROUP_FAVOURITES_FILE.open(
+        "r", encoding="utf-8"
+    ) as handle:
+        data = json.load(handle)
+
+    if not isinstance(data, dict):
+        raise ValueError("Invalid favourites database")
+
+    favourites = data.get("favorites")
+
+    if not isinstance(favourites, list):
+        raise ValueError("Missing favourites list")
+
+    result = []
+    seen = set()
+
+    for entry in favourites:
+        if not isinstance(entry, dict):
+            raise ValueError("Invalid favourite entry")
+
+        name = entry.get("name")
+        number = entry.get("number")
+
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Invalid favourite name")
+
+        if (
+            type(number) is not int
+            or number <= 0
+        ):
+            raise ValueError("Invalid favourite talkgroup number")
+
+        if number in seen:
+            continue
+
+        seen.add(number)
+
+        result.append({
+            "name": name.strip(),
+            "number": number,
+            "source": "favourite",
+        })
+
+    return result
 
 
 def load_monitored_talkgroups():
@@ -235,12 +287,14 @@ class TouchHandler(SimpleHTTPRequestHandler):
                 status_code = 200
 
             else:
-                talkgroups = load_monitored_talkgroups()
+                monitored = load_monitored_talkgroups()
+                favourites = load_talkgroup_favourites()
 
                 payload = {
                     "available": True,
                     "node_id": node_id,
-                    "talkgroups": talkgroups,
+                    "talkgroups": monitored,
+                    "favorites": favourites,
                 }
                 status_code = 200
 

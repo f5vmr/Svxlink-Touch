@@ -193,6 +193,25 @@ else
     log "Preserving existing node configuration."
 fi
 
+log "Preparing SvxLink-Touch talkgroup favourites..."
+
+TALKGROUP_DATA_DIR="/var/lib/svxlink-touch"
+TALKGROUP_DATA_FILE="$TALKGROUP_DATA_DIR/talkgroups.json"
+
+install -d -o root -g root -m 0755 "$TALKGROUP_DATA_DIR"
+
+if [[ ! -f "$TALKGROUP_DATA_FILE" ]]; then
+    log "Creating initial talkgroup favourites database..."
+
+    printf '{\n    "favorites": []\n}\n' \
+        > "$TALKGROUP_DATA_FILE"
+
+    chown root:root "$TALKGROUP_DATA_FILE"
+    chmod 0644 "$TALKGROUP_DATA_FILE"
+else
+    log "Preserving existing talkgroup favourites."
+fi
+
 log "Installing SvxLink-Touch web service..."
 
 install -o root -g root -m 0644 \

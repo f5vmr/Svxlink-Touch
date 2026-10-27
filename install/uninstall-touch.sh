@@ -109,6 +109,11 @@ if [[ -f /etc/svxlink-touch/nodes.json ]]; then
     log "Preserving node configuration: /etc/svxlink-touch/nodes.json"
 fi
 
+# Preserve installation-specific talkgroup favourites.
+if [[ -f /var/lib/svxlink-touch/talkgroups.json ]]; then
+    log "Preserving talkgroup favourites: /var/lib/svxlink-touch/talkgroups.json"
+fi
+
 systemctl daemon-reload
 
 log "Kiosk integration removed."
