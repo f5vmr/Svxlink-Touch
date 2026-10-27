@@ -2,7 +2,7 @@
 #!/usr/bin/env python3
 
 """
-SvxLink-LCD V0.4
+SvxLink-Touch V0.4
 Restricted DTMF control-service handler.
 
 Accepts authorised talkgroup and module requests through
@@ -20,7 +20,6 @@ import socket
 from dtmf_control import (
     build_module_command,
     build_talkgroup_command,
-    load_lcd_config,
     write_validated_dtmf,
 )
 
@@ -56,7 +55,7 @@ def load_favourites():
     return favourites
 
 
-# Safety default: no DTMF transmission.
+# Live transmission is subject to request and PTY validation.
 ENABLE_DTMF_TRANSMISSION = True
 
 def discover_control_destination(logic_name=None, config_path=None):
@@ -98,9 +97,35 @@ def discover_control_destination(logic_name=None, config_path=None):
     }
 
 
+def load_touch_control_config():
+    """
+    Build Touch operational control settings from
+    the actual SvxLink radio logic configuration.
+
+    No DTMF is transmitted.
+    """
+
+    destinations = discover_dtmf_logics()
+
+    if len(destinations) != 1:
+        raise ValueError(
+            "Exactly one radio DTMF logic is required"
+        )
+
+    destination = discover_control_destination()
+
+    return {
+        "control": {
+            "node_type": destination["type"],
+            "transmission_enabled": True,
+        },
+        "modules": [],
+    }
+
+
 def process_request(request, config):
     """
-    Validate a control request and return a DTMF preview.
+    Validate and process an authorised DTMF control request.
 
     Only named operations are permitted.
     Arbitrary DTMF strings are not accepted.
@@ -208,7 +233,7 @@ def process_request(request, config):
         # The macro invocation is constructed by
         # the trusted configuration parser.
         # Its definition is executed by SvxLink,
-        # not by the LCD control service.
+        # not by the Touch control service.
         command = matching[0]["command"]
 
     else:
@@ -244,7 +269,7 @@ def process_request(request, config):
         and configured_type != actual_type
     ):
         raise ValueError(
-            f"LCD node type '{configured_type}' does not match "
+            f"Touch node type '{configured_type}' does not match "
             f"SvxLink logic type '{actual_type}'"
         )
 
@@ -278,7 +303,7 @@ def main():
     Process repeated requests through a systemd-activated
     Unix socket.
 
-    Preview only: no DTMF transmission.
+    Process authorised requests through a systemd-activated Unix socket.
     """
 
     import os
@@ -294,7 +319,7 @@ def main():
     with socket.socket(fileno=3) as server:
 
         try:
-            config = load_lcd_config()
+            config = load_touch_control_config()
             control = config.get("control", {})
 
             live_enabled = (
@@ -320,7 +345,7 @@ def main():
             mode = f"control unavailable: {exc}"
 
         print(
-            f"SvxLink LCD control service ready ({mode})",
+            f"SvxLink-Touch control service ready ({mode})",
             flush=True,
         )
 
@@ -341,7 +366,7 @@ def main():
                             reader.readline(4096)
                         )
 
-                    config = load_lcd_config()
+                    config = load_touch_control_config()
 
                     result = process_request(
                         request,

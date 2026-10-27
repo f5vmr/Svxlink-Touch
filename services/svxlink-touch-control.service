@@ -1,0 +1,15 @@
+[Unit]
+Description=SvxLink-Touch DTMF Control Helper
+Requires=svxlink-touch-control.socket
+After=svxlink.service svxlink-touch-control.socket
+
+[Service]
+Type=exec
+User=svxlink
+Group=svxlink
+WorkingDirectory=@SVXLINK_TOUCH_DIR@/control
+ExecStart=/usr/bin/python3 @SVXLINK_TOUCH_DIR@/control/touch_control_service.py
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+Restart=no

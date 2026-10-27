@@ -104,6 +104,21 @@ if [[ -f "$WEB_SERVICE" ]]; then
     log "Removed SvxLink-Touch web service."
 fi
 
+# Remove SvxLink-Touch DTMF control units.
+CONTROL_SOCKET="/etc/systemd/system/svxlink-touch-control.socket"
+CONTROL_SERVICE="/etc/systemd/system/svxlink-touch-control.service"
+
+if [[ -f "$CONTROL_SOCKET" || -f "$CONTROL_SERVICE" ]]; then
+    log "Removing SvxLink-Touch DTMF control service..."
+
+    systemctl disable --now svxlink-touch-control.socket 2>/dev/null || true
+    systemctl stop svxlink-touch-control.service 2>/dev/null || true
+
+    rm -f "$CONTROL_SOCKET" "$CONTROL_SERVICE"
+
+    log "Removed SvxLink-Touch DTMF control units."
+fi
+
 # Preserve installation-specific node configuration.
 if [[ -f /etc/svxlink-touch/nodes.json ]]; then
     log "Preserving node configuration: /etc/svxlink-touch/nodes.json"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-SvxLink-LCD V0.4
+SvxLink-Touch V0.4
 Independent SvxLink DTMF control helper.
 
 No commands are transmitted by this module's
@@ -141,105 +141,6 @@ def validate_selected_port(port, enabled_ports):
         )
 
     return port
-
-
-def load_lcd_config(config_path=None):
-    """
-    Load and validate the local LCD configuration.
-
-    This function does not transmit DTMF or modify
-    the SvxLink configuration.
-    """
-
-    if config_path is None:
-        system_config = Path(
-            "/etc/svxlink-lcd/lcd_config.json"
-        )
-
-        repository_config = (
-            Path(__file__).resolve().parent
-            / "config"
-            / "lcd_config.json"
-        )
-
-        config_path = (
-            system_config
-            if system_config.exists()
-            else repository_config
-        )
-
-    with Path(config_path).open(
-        "r", encoding="utf-8"
-    ) as handle:
-        config = json.load(handle)
-
-    if not isinstance(config, dict):
-        raise ValueError("Invalid LCD configuration")
-
-    control = config.get("control")
-    talkgroups = config.get("talkgroups")
-    modules = config.get("modules")
-
-    if not isinstance(control, dict):
-        raise ValueError("Missing control configuration")
-
-    node_type = control.get("node_type")
-
-    if node_type not in ("simplex", "repeater", "multiport"):
-        raise ValueError("Invalid node type")
-
-    transmission_enabled = control.get(
-        "transmission_enabled", False
-    )
-
-    if type(transmission_enabled) is not bool:
-        raise ValueError(
-            "transmission_enabled must be a JSON boolean"
-        )
-
-    if not isinstance(talkgroups, dict):
-        raise ValueError("Invalid talkgroup configuration")
-
-    if talkgroups.get("prefix") != "91":
-        raise ValueError("Unsupported talkgroup prefix")
-
-    favourites = talkgroups.get("favorites")
-
-    if not isinstance(favourites, list):
-        raise ValueError("Invalid talkgroup favourites")
-
-    for favourite in favourites:
-        if not isinstance(favourite, dict):
-            raise ValueError("Invalid talkgroup entry")
-
-        build_talkgroup_command(favourite.get("number"))
-
-        if not isinstance(favourite.get("name"), str):
-            raise ValueError("Invalid talkgroup name")
-
-    if not isinstance(modules, list):
-        raise ValueError("Invalid module list")
-
-    for module in modules:
-        if not isinstance(module, dict):
-            raise ValueError("Invalid module entry")
-
-        if not isinstance(module.get("name"), str):
-            raise ValueError("Invalid module name")
-
-        build_module_command(module.get("dtmf_id"))
-
-    if node_type == "multiport":
-        validate_selected_port(
-            control.get("selected_port"),
-            control.get("enabled_ports", []),
-        )
-    elif control.get("selected_port") is not None:
-        raise ValueError(
-            "Single-port configuration must not select a port"
-        )
-
-    return config
 
 
 def send_dtmf(

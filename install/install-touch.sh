@@ -212,6 +212,19 @@ else
     log "Preserving existing talkgroup favourites."
 fi
 
+log "Installing SvxLink-Touch DTMF control service..."
+
+install -o root -g root -m 0644 \
+    "$PROJECT_DIR/services/svxlink-touch-control.socket" \
+    /etc/systemd/system/svxlink-touch-control.socket
+
+install -o root -g root -m 0644 \
+    "$PROJECT_DIR/services/svxlink-touch-control.service" \
+    /etc/systemd/system/svxlink-touch-control.service
+sed -i \
+    -e "s|@SVXLINK_TOUCH_DIR@|$PROJECT_DIR|g" \
+    /etc/systemd/system/svxlink-touch-control.service
+
 log "Installing SvxLink-Touch web service..."
 
 install -o root -g root -m 0644 \
@@ -224,6 +237,9 @@ sed -i \
 
 log "Reloading systemd configuration..."
 systemctl daemon-reload
+
+log "Enabling SvxLink-Touch DTMF control socket..."
+systemctl enable svxlink-touch-control.socket
 
 log "Enabling SvxLink-Touch web service..."
 systemctl enable svxlink-touch-web.service

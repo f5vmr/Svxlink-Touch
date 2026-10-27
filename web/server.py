@@ -3,6 +3,7 @@
 
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
+import socket
 import configparser
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
@@ -193,6 +194,146 @@ class TouchHandler(SimpleHTTPRequestHandler):
 
         super().do_GET()
 
+    def handle_talkgroup_control(self):
+        """Forward an authorised local talkgroup request to the control service."""
+
+        payload = {}
+        status_code = 400
+
+        try:
+            origin = self.headers.get("Origin")
+
+            if origin != "http://127.0.0.1:8080":
+                raise ValueError(
+                    "Control requests must originate from "
+                    "the local SvxLink-Touch interface"
+                )
+            content_type = self.headers.get(
+                "Content-Type", ""
+            ).split(";", 1)[0].strip().lower()
+
+            if content_type != "application/json":
+                raise ValueError("JSON content required")
+
+            content_length = int(
+                self.headers.get("Content-Length", "0")
+            )
+
+            if not 0 < content_length <= 4096:
+                raise ValueError("Invalid request length")
+
+            request_data = json.loads(
+                self.rfile.read(content_length)
+            )
+
+            if (
+                not isinstance(request_data, dict)
+                or set(request_data) != {
+                    "node_id", "action", "value"
+                }
+            ):
+                raise ValueError("Invalid control request")
+
+            node_id = request_data["node_id"]
+            action = request_data["action"]
+            value = request_data["value"]
+
+            if (
+                not isinstance(node_id, str)
+                or action != "talkgroup"
+                or type(value) is not int
+                or value <= 0
+            ):
+                raise ValueError("Invalid talkgroup request")
+
+            nodes = load_nodes()
+
+            node = next(
+                (
+                    entry for entry in nodes
+                    if entry.get("id") == node_id
+                ),
+                None,
+            )
+
+            if node is None:
+                status_code = 404
+                raise ValueError("Unknown or disabled node")
+
+            if node.get("local") is not True:
+                raise ValueError(
+                    "Remote talkgroup control is not yet available"
+                )
+
+            # Authorise only the configured local node.
+            # The control service independently validates
+            # the talkgroup, active logic and PTY.
+            control_request = {
+                "action": "talkgroup",
+                "value": value,
+            }
+
+            with socket.socket(
+                socket.AF_UNIX,
+                socket.SOCK_STREAM,
+            ) as connection:
+                connection.settimeout(3.0)
+                connection.connect(
+                    "/run/svxlink-touch/control.sock"
+                )
+
+                connection.sendall(
+                    (
+                        json.dumps(control_request) + "\n"
+                    ).encode("utf-8")
+                )
+
+                with connection.makefile(
+                    "r", encoding="utf-8"
+                ) as response:
+                    result = json.loads(
+                        response.readline(4096)
+                    )
+
+            if not isinstance(result, dict):
+                raise ValueError("Invalid control service response")
+
+            payload = {
+                "success": result.get("success") is True,
+                "node_id": node_id,
+                "command": result.get("command"),
+                "transmitted": result.get("transmitted") is True,
+                "error": result.get("error"),
+            }
+
+            status_code = (
+                200 if payload["success"] else 400
+            )
+
+        except (ValueError, TypeError, KeyError) as error:
+            payload = {
+                "success": False,
+                "transmitted": False,
+                "error": str(error),
+            }
+
+        except (OSError, TimeoutError) as error:
+            status_code = 503
+            payload = {
+                "success": False,
+                "transmitted": False,
+                "error": str(error),
+            }
+
+        result = json.dumps(payload).encode("utf-8")
+
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(result)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(result)
+
     def handle_node_status(self):
         """Retrieve status for a configured SvxLink node."""
         from urllib.parse import parse_qs, urlsplit
@@ -315,6 +456,18 @@ class TouchHandler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(result)
+
+    def do_POST(self):
+        """Route supported touchscreen control requests."""
+        from urllib.parse import urlsplit
+
+        request_path = urlsplit(self.path).path
+
+        if request_path == "/api/talkgroup-control":
+            self.handle_talkgroup_control()
+            return
+
+        self.send_error(404, "Unknown control endpoint")
 
     def handle_nodes(self):
         """Return the enabled nodes configured for SvxLink-Touch."""

@@ -2,7 +2,7 @@
 #!/usr/bin/env python3
 
 """
-SvxLink-LCD V0.5
+SvxLink-Touch V0.4
 
 Read SvxLink configuration and discover DTMF control
 destinations without modifying the configuration or
