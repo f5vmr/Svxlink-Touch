@@ -77,14 +77,82 @@ Screen saver behaviour and inactivity timing remain to be implemented.
 - [x] Cage and Chromium installed.
 - [x] Application logo selected.
 - [x] Git repository created.
-- [ ] First Cage graphical session tested.
-- [ ] Touchscreen browser interaction verified.
-- [ ] SvxLink-Touch interface implemented.
-- [ ] Dashboard API integration implemented.
-- [ ] Automatic startup configured.
+- [x] First Cage graphical session tested.
+- [x] Touchscreen browser interaction verified.
+- [x] SvxLink-Touch interface implemented.
+- [x] Dashboard API integration implemented.
+- [x] Automatic startup configured.
 - [ ] Screen saver implemented.
-- [ ] Automated installer completed.
+- [x] Automated installer completed.
 
 ## Next Milestone
 
 Launch a graphical application under Cage on the Raspberry Pi 3B and verify touchscreen operation without installing a conventional desktop environment.
+## Development log:
+Installer V0.2 startup passed; transient warnings observed. Temporary startup logging enabled for diagnosis. This diagnostic logging should not become a permanent installer feature unless needed.
+
+## 27 October 2026 — Cage startup diagnostics resolved.
+
+Cage/libseat reports that /run/seatd.sock is unavailable, skips that backend and uses systemd-logind. Touchscreen, Chromium and Dashboard operate successfully. These startup messages are informational, not installation failures. No corrective action required.
+## 27 October 2026 — Installer V0.2: Unattended Boot Successful
+
+### Test platform
+- Raspberry Pi 3B
+- Raspberry Pi OS Lite, Debian 13 Trixie, arm64
+- 800 x 480 DSI touchscreen
+- Cage Wayland compositor
+- Chromium kiosk browser
+- SvxLink 26.05.2
+- SvxLink-Dash V4.1
+
+### Verified
+- Installer repeat execution successful
+- tty2 automatic login operational
+- systemd console activation service operational
+- Automatic switching to tty2 successful
+- Cage and Chromium started without intervention
+- Full SvxLink Dashboard displayed after reboot
+- Temporary startup diagnostics removed
+- Repository startup script restored
+
+### Outcome
+Installer V0.2 successfully provides an unattended
+touchscreen kiosk environment.
+
+### Next development phase
+Design and implement the native SvxLink-Touch interface,
+optimised for the 800 x 480 touchscreen.
+
+The existing SvxLink-Dash V4.1 API will provide node status
+and, where authorised, control functionality.
+
+## 27 October 2026 — V0.3 Welcome Screen and Screensaver
+
+### Completed
+- SvxLink-Touch web interface running on port 8080
+- Existing SvxLink-Touch logo displayed at startup
+- Touch anywhere on the logo to enter the application
+- Automatic return to the logo after inactivity
+- Default inactivity timeout: 5 minutes
+- Inactivity timer reset by touchscreen interaction
+- Timeout can be disabled by setting INACTIVITY_MINUTES to 0
+- No interruption to SvxLink or Dashboard services
+- Fully unattended Raspberry Pi startup retained
+
+### Validation
+- Welcome screen displayed: PASS
+- Touch-to-enter navigation: PASS
+- Automatic return to logo: PASS
+- Touch-to-reopen after timeout: PASS
+
+### Next Development Phase
+V0.4 — Node Status Interface
+
+Use the existing SvxLink-Dash V4.1 API to provide:
+- Local node selection by default
+- Last selected node when no local node is available
+- Saved remote nodes using LAN, hostname or Tailscale addresses
+- Receiver and transmitter status
+- Reflector and talkgroup information
+- Support for SimplexLogic, RepeaterLogic and radio-less nodes
+
