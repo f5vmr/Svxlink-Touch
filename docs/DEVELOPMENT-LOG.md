@@ -156,3 +156,22 @@ Use the existing SvxLink-Dash V4.1 API to provide:
 - Reflector and talkgroup information
 - Support for SimplexLogic, RepeaterLogic and radio-less nodes
 
+## 27 October 2026 — V0.4 Multi-Node Selection Validated
+
+### Completed
+- Touch-sensitive title bar opens node-selection overlay
+- Configured nodes retrieved through /api/nodes
+- Node status retrieved through /api/node-status
+- Local and remote node switching tested successfully
+- Existing four-panel status layout preserved
+- Five-second status polling retained
+- No changes required to SvxLink or SvxLink-Dash
+
+### Live Test
+- Local node: 192.168.1.90 — PASS
+- Remote node: 192.168.1.214 (MB5HT) — PASS
+- Switching in both directions — PASS
+
+### Next Task
+Separate installation-specific node configuration from the
+public GitHub repository while preserving existing configured nodes.

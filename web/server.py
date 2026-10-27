@@ -10,7 +10,16 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 WEB_ROOT = PROJECT_ROOT / "web"
 ASSETS_ROOT = PROJECT_ROOT / "assets"
-CONFIG_FILE = PROJECT_ROOT / "config" / "nodes.json"
+# Use the installed configuration when available.
+# Retain the existing repository configuration during migration.
+INSTALLED_CONFIG_FILE = Path("/etc/svxlink-touch/nodes.json")
+LEGACY_CONFIG_FILE = PROJECT_ROOT / "config" / "nodes.json"
+
+CONFIG_FILE = (
+    INSTALLED_CONFIG_FILE
+    if INSTALLED_CONFIG_FILE.is_file()
+    else LEGACY_CONFIG_FILE
+)
 
 
 def load_nodes():

@@ -10,3 +10,5 @@ __pycache__/
 
 # Development
 .vscode/
+# Installation-specific node configuration
+/config/nodes.json

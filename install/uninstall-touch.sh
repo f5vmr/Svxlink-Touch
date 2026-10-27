@@ -104,6 +104,11 @@ if [[ -f "$WEB_SERVICE" ]]; then
     log "Removed SvxLink-Touch web service."
 fi
 
+# Preserve installation-specific node configuration.
+if [[ -f /etc/svxlink-touch/nodes.json ]]; then
+    log "Preserving node configuration: /etc/svxlink-touch/nodes.json"
+fi
+
 systemctl daemon-reload
 
 log "Kiosk integration removed."

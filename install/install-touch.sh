@@ -176,6 +176,23 @@ install -o root -g root -m 0644 \
   "$PROJECT_DIR/services/svxlink-touch-console.service" \
   /etc/systemd/system/svxlink-touch-console.service
 
+log "Preparing SvxLink-Touch node configuration..."
+
+NODE_CONFIG_DIR="/etc/svxlink-touch"
+NODE_CONFIG_FILE="$NODE_CONFIG_DIR/nodes.json"
+
+install -d -o root -g root -m 0755 "$NODE_CONFIG_DIR"
+
+if [[ ! -f "$NODE_CONFIG_FILE" ]]; then
+    log "Creating default node configuration..."
+
+    install -o root -g root -m 0644 \
+        "$PROJECT_DIR/config/nodes.example.json" \
+        "$NODE_CONFIG_FILE"
+else
+    log "Preserving existing node configuration."
+fi
+
 log "Installing SvxLink-Touch web service..."
 
 install -o root -g root -m 0644 \
