@@ -175,3 +175,26 @@ Use the existing SvxLink-Dash V4.1 API to provide:
 ### Next Task
 Separate installation-specific node configuration from the
 public GitHub repository while preserving existing configured nodes.
+
+## 27 October 2026 — V0.4 Node Configuration Migration
+
+### Completed
+- Separated installation-specific node configuration from GitHub
+- Added generic config/nodes.example.json
+- Installed node configuration stored in /etc/svxlink-touch/nodes.json
+- Installer preserves existing node configuration
+- Uninstaller preserves existing node configuration
+- Python web server reads installed node configuration
+- Local and remote node selection retained
+
+### Validation
+- Local node API: PASS
+- Remote node API: PASS
+- Title-bar node selection: PASS
+- Switching between local and remote nodes: PASS
+- Existing touchscreen layout: PASS
+
+### Outcome
+SvxLink-Touch now supports installation-specific node lists
+without embedding individual node addresses in the public
+repository or overwriting them during upgrades.
