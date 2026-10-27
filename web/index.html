@@ -65,11 +65,25 @@
             min-width: 0;
         }
 
-        .app-title {
-            color: #68baff;
-            font-size: 15px;
-            font-weight: bold;
-            letter-spacing: 2px;
+        .node-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .header-logo {
+            display: block;
+            width: 90px;
+            height: 56px;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        .node-heading h1 {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .status-header h1 {
@@ -262,8 +276,11 @@
             role="button"
             tabindex="0"
             aria-label="Select SvxLink node">
-        <div>
-            <div class="app-title">SVXLINK-TOUCH</div>
+        <div class="node-heading">
+            <img class="header-logo"
+                 src="/assets/branding/svxlink-touch-logo.png"
+                 alt="SvxLink-Touch">
+
             <h1 id="node-callsign">Connecting...</h1>
         </div>
 
