@@ -629,21 +629,79 @@
         talkgroupAvailableList.hidden = false;
     }
 
-    function confirmTalkgroupPreview() {
+    async function confirmTalkgroupPreview() {
         if (
             !pendingTalkgroup ||
-            pendingTalkgroup.nodeId !== selectedNodeId
+            pendingTalkgroup.nodeId !== selectedNodeId ||
+            talkgroupConfirm.disabled
         ) {
-            cancelTalkgroupPreview();
             return;
         }
 
-        document.getElementById(
+        const request = {
+            node_id: pendingTalkgroup.nodeId,
+            action: "talkgroup",
+            value: pendingTalkgroup.number
+        };
+
+        const confirmedTalkgroup = pendingTalkgroup;
+
+        const resultElement = document.getElementById(
             "talkgroup-confirmation-result"
-        ).textContent =
-            "Preview acknowledged — no DTMF transmitted.";
+        );
 
         talkgroupConfirm.disabled = true;
+        talkgroupCancel.disabled = true;
+        talkgroupClose.disabled = true;
+        resultElement.textContent = "Sending talkgroup command...";
+
+        try {
+            const response = await fetch("/api/talkgroup-control", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(request)
+            });
+
+            const result = await response.json();
+
+            if (
+                talkgroupOverlay.hidden ||
+                pendingTalkgroup !== confirmedTalkgroup ||
+                selectedNodeId !== request.node_id
+            ) {
+                return;
+            }
+
+            if (
+                response.ok &&
+                result.success === true &&
+                result.transmitted === true &&
+                result.node_id === request.node_id &&
+                result.command === confirmedTalkgroup.command
+            ) {
+                resultElement.textContent =
+                    "Talkgroup command transmitted successfully.";
+            } else {
+                resultElement.textContent =
+                    result.error || "Talkgroup command not transmitted.";
+            }
+
+        } catch (error) {
+            if (
+                !talkgroupOverlay.hidden &&
+                pendingTalkgroup === confirmedTalkgroup &&
+                selectedNodeId === request.node_id
+            ) {
+                resultElement.textContent =
+                    "Unable to communicate with the control service.";
+            }
+
+        } finally {
+            talkgroupCancel.disabled = false;
+            talkgroupClose.disabled = false;
+        }
     }
 
     talkgroupCancel.addEventListener("click", function () {
