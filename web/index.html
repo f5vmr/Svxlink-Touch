@@ -223,7 +223,8 @@
             font-size: 26px;
         }
 
-        #node-close {
+        #node-close
+        #talkgroup-close {
             min-height: 44px;
             padding: 8px 20px;
             border: 1px solid #426588;
@@ -310,7 +311,11 @@
             <div id="node-reflector" class="network-value">—</div>
         </div>
 
-        <div class="status-card">
+        <div id="talkgroup-card"
+             class="status-card"
+             role="button"
+             tabindex="0"
+             aria-label="Open talkgroup selection">
             <div class="card-label">TALKGROUP</div>
             <div id="node-talkgroup" class="network-value">—</div>
         </div>
@@ -346,7 +351,34 @@
 
         </section>
     </div>
+    <!-- Talkgroup selection overlay -->
+    <div id="talkgroup-overlay" class="node-overlay" hidden>
+        <section class="node-dialog"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="talkgroup-dialog-title">
 
+            <div class="node-dialog-header">
+                <h2 id="talkgroup-dialog-title">Talkgroups</h2>
+                <button type="button" id="talkgroup-close">Close</button>
+            </div>
+
+            <div class="node-list">
+                <div>
+                    NODE:
+                    <strong id="talkgroup-selected-node">—</strong>
+                </div>
+
+                <div>
+                    ACTIVE TALKGROUP:
+                    <strong id="talkgroup-current">—</strong>
+                </div>
+
+                <div>Talkgroup selection is not yet enabled.</div>
+            </div>
+
+        </section>
+    </div>
 <script>
     // SvxLink-Touch inactivity timeout, in minutes.
     // Set to 0 to disable automatic return to the logo.
@@ -495,6 +527,35 @@
     });
 
     nodeClose.addEventListener("click", closeNodeSelector);
+
+    const talkgroupCard = document.getElementById("talkgroup-card");
+    const talkgroupOverlay = document.getElementById("talkgroup-overlay");
+    const talkgroupClose = document.getElementById("talkgroup-close");
+
+    function openTalkgroupSelector() {
+        document.getElementById("talkgroup-selected-node").textContent =
+            selectedNodeName;
+
+        document.getElementById("talkgroup-current").textContent =
+            document.getElementById("node-talkgroup").textContent;
+
+        talkgroupOverlay.hidden = false;
+    }
+
+    function closeTalkgroupSelector() {
+        talkgroupOverlay.hidden = true;
+    }
+
+    talkgroupCard.addEventListener("click", openTalkgroupSelector);
+
+    talkgroupCard.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openTalkgroupSelector();
+        }
+    });
+
+    talkgroupClose.addEventListener("click", closeTalkgroupSelector);
 
     let inactivityTimer = null;
     let currentPage = "welcome";
