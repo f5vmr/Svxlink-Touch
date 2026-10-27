@@ -374,7 +374,9 @@
                     <strong id="talkgroup-current">—</strong>
                 </div>
 
-                <div>Talkgroup selection is not yet enabled.</div>
+                <div id="talkgroup-available-list">
+                    Loading available talkgroups...
+                </div>
             </div>
 
         </section>
@@ -532,14 +534,92 @@
     const talkgroupOverlay = document.getElementById("talkgroup-overlay");
     const talkgroupClose = document.getElementById("talkgroup-close");
 
-    function openTalkgroupSelector() {
+        async function openTalkgroupSelector() {
+        const requestedNodeId = selectedNodeId;
+        const availableList = document.getElementById(
+            "talkgroup-available-list"
+        );
+
         document.getElementById("talkgroup-selected-node").textContent =
             selectedNodeName;
 
         document.getElementById("talkgroup-current").textContent =
             document.getElementById("node-talkgroup").textContent;
 
+        availableList.replaceChildren();
+        availableList.textContent = "Loading available talkgroups...";
+
         talkgroupOverlay.hidden = false;
+
+        try {
+            const response = await fetch(
+                "/api/talkgroups?id=" + encodeURIComponent(requestedNodeId),
+                { cache: "no-store" }
+            );
+
+            if (!response.ok) {
+                throw new Error("Unable to retrieve talkgroups");
+            }
+
+            const result = await response.json();
+
+            if (
+                talkgroupOverlay.hidden ||
+                selectedNodeId !== requestedNodeId
+            ) {
+                return;
+            }
+
+            availableList.replaceChildren();
+
+            if (!result.available) {
+                availableList.textContent =
+                    result.error || "Talkgroup discovery unavailable";
+                return;
+            }
+
+            const favourites = result.favorites || [];
+            const monitored = result.talkgroups || [];
+
+            if (favourites.length === 0 && monitored.length === 0) {
+                availableList.textContent =
+                    "No favourite or monitored talkgroups configured.";
+                return;
+            }
+
+            function appendTalkgroupSection(title, entries) {
+                if (entries.length === 0) {
+                    return;
+                }
+
+                const heading = document.createElement("h3");
+                heading.textContent = title;
+                availableList.appendChild(heading);
+
+                for (const entry of entries) {
+                    const item = document.createElement("div");
+
+                    const number = entry.number ?? entry.tg;
+
+                    item.textContent =
+                        entry.name + " — TG " + number;
+
+                    availableList.appendChild(item);
+                }
+            }
+
+            appendTalkgroupSection("Favourites", favourites);
+            appendTalkgroupSection("Monitored Talkgroups", monitored);
+
+        } catch (error) {
+            if (
+                !talkgroupOverlay.hidden &&
+                selectedNodeId === requestedNodeId
+            ) {
+                availableList.textContent =
+                    "Unable to load talkgroups";
+            }
+        }
     }
 
     function closeTalkgroupSelector() {
