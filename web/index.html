@@ -12,7 +12,8 @@
             box-sizing: border-box;
         }
 
-        html, body {
+        html,
+        body {
             width: 100%;
             height: 100%;
             margin: 0;
@@ -20,6 +21,8 @@
             background: #081426;
             font-family: Arial, sans-serif;
         }
+
+        /* Welcome screen */
 
         #welcome {
             display: flex;
@@ -38,17 +41,128 @@
             object-fit: contain;
         }
 
+        /* Main status screen */
+
         #main {
             display: none;
             width: 100vw;
             height: 100vh;
-            padding: 20px;
-            color: white;
+            padding: 16px;
+            color: #ffffff;
+            background: #081426;
+            grid-template-rows: 76px minmax(0, 1fr) minmax(0, 1fr) 32px;
+            gap: 12px;
         }
 
-        #main h1 {
-            margin: 0;
+        /* Header */
+
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-width: 0;
+        }
+
+        .app-title {
             color: #68baff;
+            font-size: 15px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .status-header h1 {
+            margin: 4px 0 0;
+            color: #ffffff;
+            font-size: 34px;
+        }
+
+        .connection-indicator {
+            padding: 10px 16px;
+            border-radius: 8px;
+            background: #174535;
+            color: #8effbf;
+            font-size: 14px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        /* Radio and network panels */
+
+        .radio-panel,
+        .network-panel {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            min-height: 0;
+        }
+
+        .status-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0;
+            min-height: 0;
+            padding: 16px;
+            border: 1px solid #29435f;
+            border-radius: 12px;
+            background: #172a42;
+        }
+
+        .card-label {
+            margin-bottom: 10px;
+            color: #b8c9df;
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .card-value {
+            color: #ffffff;
+            font-size: 34px;
+            font-weight: bold;
+        }
+
+        .network-value {
+            color: #ffffff;
+            font-size: 27px;
+            font-weight: bold;
+            overflow-wrap: anywhere;
+        }
+
+        /* Receiver and transmitter indicators */
+
+        .receiver-card.active {
+            border-color: #22c55e;
+            background: #123d2b;
+        }
+
+        .receiver-card.active .card-value {
+            color: #4ade80;
+        }
+
+        .transmitter-card.active {
+            border-color: #ef4444;
+            background: #4a2028;
+        }
+
+        .transmitter-card.active .card-value {
+            color: #ff7777;
+        }
+
+        .connection-indicator.offline {
+            background: #4a2028;
+            color: #ff7777;
+        }
+        /* Footer */
+
+        .status-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-width: 0;
+            color: #a9bed5;
+            font-size: 13px;
+            text-transform: uppercase;
         }
     </style>
 </head>
@@ -61,17 +175,55 @@
     </div>
 
 <main id="main">
-    <h1>SvxLink-Touch</h1>
 
-    <section id="node-status">
-        <h2 id="node-callsign">Connecting...</h2>
+    <header class="status-header">
+        <div>
+            <div class="app-title">SVXLINK-TOUCH</div>
+            <h1 id="node-callsign">Connecting...</h1>
+        </div>
 
-        <p>Node: <span id="node-type">—</span></p>
-        <p>Receiver: <span id="node-rx">—</span></p>
-        <p>Transmitter: <span id="node-tx">—</span></p>
-        <p>Reflector: <span id="node-reflector">—</span></p>
-        <p>Talkgroup: <span id="node-talkgroup">—</span></p>
+        <div id="connection-indicator" class="connection-indicator">
+            LIVE STATUS
+        </div>
+    </header>
+
+    <section class="radio-panel">
+
+        <div class="status-card receiver-card">
+            <div class="card-label">RECEIVER</div>
+            <div id="node-rx" class="card-value">—</div>
+        </div>
+
+        <div class="status-card transmitter-card">
+            <div class="card-label">TRANSMITTER</div>
+            <div id="node-tx" class="card-value">—</div>
+        </div>
+
     </section>
+
+    <section class="network-panel">
+
+        <div class="status-card">
+            <div class="card-label">REFLECTOR</div>
+            <div id="node-reflector" class="network-value">—</div>
+        </div>
+
+        <div class="status-card">
+            <div class="card-label">TALKGROUP</div>
+            <div id="node-talkgroup" class="network-value">—</div>
+        </div>
+
+    </section>
+
+    <footer class="status-footer">
+        <div>
+            NODE TYPE:
+            <span id="node-type">—</span>
+        </div>
+
+        <div>SVXLINK-TOUCH V0.4</div>
+    </footer>
+
 </main>
 
 <script>
@@ -125,14 +277,35 @@
 
             document.getElementById("node-tx").textContent =
                 radio.tx ? "Active" : "Idle";
+            // Update receiver and transmitter activity indicators.
+            document.querySelector(".receiver-card")
+                .classList.toggle("active", radio.rx === true);
 
+            document.querySelector(".transmitter-card")
+                .classList.toggle("active", radio.tx === true);
             document.getElementById("node-reflector").textContent =
                 status.reflector || "Unknown";
-
+            // Reflect the actual remote API connection state.
+            const indicator = document.getElementById("connection-indicator");
+            indicator.textContent = "LIVE STATUS";
+            indicator.classList.remove("offline");
             document.getElementById("node-talkgroup").textContent =
                 status.active_talkgroup || "Standby";
 
         } catch (error) {
+            // Clear stale activity indicators if MB5HT becomes unreachable.
+            document.querySelector(".receiver-card")
+                .classList.remove("active");
+
+            document.querySelector(".transmitter-card")
+                .classList.remove("active");
+
+            // Indicate loss of remote API connectivity.
+            const indicator = document.getElementById("connection-indicator");
+            indicator.textContent = "OFFLINE";
+            indicator.classList.add("offline");
+
+            // Reset displayed node information.
             document.getElementById("node-callsign").textContent =
                 "MB5HT — Offline";
 
@@ -149,7 +322,7 @@
 
     function showMain() {
         welcome.style.display = "none";
-        main.style.display = "block";
+        main.style.display = "grid";
         currentPage = "main";
         updateNodeStatus();
         resetInactivityTimer();
