@@ -65,15 +65,60 @@
         <p>Node status interface — under development</p>
     </main>
 
-    <script>
-        const welcome = document.getElementById("welcome");
-        const main = document.getElementById("main");
+<script>
+    // SvxLink-Touch inactivity timeout, in minutes.
+    // Set to 0 to disable automatic return to the logo.
+    const INACTIVITY_MINUTES = 5;
 
-        welcome.addEventListener("click", function () {
-            welcome.style.display = "none";
-            main.style.display = "block";
+    const welcome = document.getElementById("welcome");
+    const main = document.getElementById("main");
+
+    let inactivityTimer = null;
+    let currentPage = "welcome";
+
+    function showWelcome() {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
+
+        main.style.display = "none";
+        welcome.style.display = "flex";
+        currentPage = "welcome";
+    }
+
+    function showMain() {
+        welcome.style.display = "none";
+        main.style.display = "block";
+        currentPage = "main";
+
+        resetInactivityTimer();
+    }
+
+    function resetInactivityTimer() {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
+
+        if (currentPage !== "main" || INACTIVITY_MINUTES <= 0) {
+            return;
+        }
+
+        inactivityTimer = setTimeout(
+            showWelcome,
+            INACTIVITY_MINUTES * 60 * 1000
+        );
+    }
+
+    // Touch the logo to enter SvxLink-Touch.
+    welcome.addEventListener("click", showMain);
+
+    // Reset timeout whenever the application is used.
+    ["pointerdown", "keydown", "wheel"].forEach(function (eventName) {
+        document.addEventListener(eventName, function () {
+            if (currentPage === "main") {
+                resetInactivityTimer();
+            }
         });
-    </script>
+    });
+</script>
 
 </body>
 </html>
