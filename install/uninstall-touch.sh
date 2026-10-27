@@ -91,6 +91,19 @@ if [[ -f "$CONSOLE_SERVICE" ]]; then
     log "Removed SvxLink-Touch console activation service."
 fi
 
+# Remove the SvxLink-Touch web service.
+WEB_SERVICE="/etc/systemd/system/svxlink-touch-web.service"
+
+if [[ -f "$WEB_SERVICE" ]]; then
+    log "Stopping and disabling SvxLink-Touch web service..."
+
+    systemctl disable --now svxlink-touch-web.service
+
+    rm -f "$WEB_SERVICE"
+
+    log "Removed SvxLink-Touch web service."
+fi
+
 systemctl daemon-reload
 
 log "Kiosk integration removed."

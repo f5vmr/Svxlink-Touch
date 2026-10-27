@@ -1,8 +1,8 @@
 # SvxLink-Touch automatic console selection
 [Unit]
 Description=Activate SvxLink-Touch console on tty2
-After=getty@tty2.service
-Requires=getty@tty2.service
+After=svxlink-touch-web.service getty@tty2.service
+Requires=svxlink-touch-web.service getty@tty2.service
 ConditionPathExists=/dev/tty2
 
 [Service]

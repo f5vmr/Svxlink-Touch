@@ -176,8 +176,21 @@ install -o root -g root -m 0644 \
   "$PROJECT_DIR/services/svxlink-touch-console.service" \
   /etc/systemd/system/svxlink-touch-console.service
 
+log "Installing SvxLink-Touch web service..."
+
+install -o root -g root -m 0644 \
+  "$PROJECT_DIR/services/svxlink-touch-web.service" \
+  /etc/systemd/system/svxlink-touch-web.service
+sed -i \
+  -e "s|@SVXLINK_TOUCH_USER@|$KIOSK_USER|g" \
+  -e "s|@SVXLINK_TOUCH_DIR@|$PROJECT_DIR|g" \
+  /etc/systemd/system/svxlink-touch-web.service
+
 log "Reloading systemd configuration..."
 systemctl daemon-reload
+
+log "Enabling SvxLink-Touch web service..."
+systemctl enable svxlink-touch-web.service
 
 log "Enabling tty2 autologin at boot..."
 systemctl enable getty@tty2.service
@@ -185,9 +198,7 @@ systemctl enable getty@tty2.service
 log "Enabling automatic console selection..."
 systemctl enable svxlink-touch-console.service
 
-log "Kiosk files installed."
-log "Automatic startup will take effect at the next tty2 login."
-
-log "SvxLink-Touch V0.2 installation completed successfully."
+log "SvxLink-Touch V0.3 installation completed successfully."
+log "Web interface configured on http://127.0.0.1:8080/"
 log "Kiosk startup configured for tty2."
-log "The graphical session will start at the next tty2 login."
+log "Automatic startup will take effect on the next boot."

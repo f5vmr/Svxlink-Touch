@@ -1,0 +1,16 @@
+# SvxLink-Touch local web interface
+
+[Unit]
+Description=SvxLink-Touch Web Interface
+After=network.target
+
+[Service]
+Type=simple
+User=@SVXLINK_TOUCH_USER@
+WorkingDirectory=@SVXLINK_TOUCH_DIR@
+ExecStart=/usr/bin/python3 @SVXLINK_TOUCH_DIR@/web/server.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
