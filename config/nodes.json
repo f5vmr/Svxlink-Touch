@@ -1,0 +1,19 @@
+{
+    "schema_version": 1,
+    "nodes": [
+        {
+            "id": "local",
+            "name": "Local SvxLink",
+            "url": "http://127.0.0.1:5000",
+            "enabled": true,
+            "local": true
+        },
+        {
+            "id": "mb5ht",
+            "name": "MB5HT",
+            "url": "http://192.168.1.214:5000",
+            "enabled": true,
+            "local": false
+        }
+    ]
+}
