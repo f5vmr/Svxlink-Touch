@@ -173,6 +173,9 @@ systemd-analyze verify getty@tty2.service
 log "Reloading systemd configuration..."
 systemctl daemon-reload
 
+log "Enabling tty2 autologin at boot..."
+systemctl enable getty@tty2.service
+
 log "Kiosk files installed."
 log "Automatic startup will take effect at the next tty2 login."
 

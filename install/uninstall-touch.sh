@@ -62,6 +62,7 @@ AUTLOGIN_FILE="/etc/systemd/system/getty@tty2.service.d/autologin.conf"
 if [[ -f "$AUTLOGIN_FILE" ]]; then
     if grep -Fqx '# Managed by SvxLink-Touch' "$AUTLOGIN_FILE"; then
         rm -f "$AUTLOGIN_FILE"
+        TOUCH_AUTLOGIN_REMOVED=1
         log "Removed SvxLink-Touch tty2 autologin configuration."
     else
         log "Preserving externally managed tty2 configuration."
@@ -71,6 +72,11 @@ fi
 rmdir \
     /etc/systemd/system/getty@tty2.service.d \
     2>/dev/null || true
+# Disable tty2 autostart only when our configuration was removed.
+if [[ "${TOUCH_AUTLOGIN_REMOVED:-0}" == "1" ]]; then
+    log "Disabling SvxLink-Touch tty2 autostart..."
+    systemctl disable getty@tty2.service
+fi
 
 systemctl daemon-reload
 
