@@ -93,5 +93,89 @@ log "Installed versions:"
 cage -v
 chromium --version
 
-log "Initial installation completed successfully."
-log "Graphical launch and autostart are not yet configured."
+
+#
+# SvxLink-Touch V0.2 — Kiosk installation
+#
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+KIOSK_USER="${SVXLINK_TOUCH_USER:-${SUDO_USER:-pi}}"
+KIOSK_HOME="$(getent passwd "$KIOSK_USER" | cut -d: -f6)"
+
+if [[ -z "$KIOSK_HOME" || "$KIOSK_HOME" == "/" ]]; then
+    fail "Cannot determine home directory for $KIOSK_USER."
+fi
+
+log "Installing kiosk for user: $KIOSK_USER"
+
+# Configure tty2 automatic login.
+AUTLOGIN_FILE="/etc/systemd/system/getty@tty2.service.d/autologin.conf"
+
+if [[ -e "$AUTLOGIN_FILE" ]]; then
+    if ! grep -Fq '# Managed by SvxLink-Touch' "$AUTLOGIN_FILE"; then
+        fail "Existing tty2 autologin configuration found. Refusing to overwrite it."
+    fi
+fi
+
+# Install the graphical launcher.
+install -o root -g root -m 0755 \
+    "$PROJECT_DIR/services/svxlink-touch-kiosk.sh" \
+    /usr/local/bin/svxlink-touch-kiosk
+
+# Install the tty2 startup integration.
+install -d -o root -g root -m 0755 \
+    /usr/local/lib/svxlink-touch
+
+install -o root -g root -m 0644 \
+    "$PROJECT_DIR/services/svxlink-touch-profile.sh" \
+    /usr/local/lib/svxlink-touch/profile.sh
+
+install -d -m 0755 \
+    /etc/systemd/system/getty@tty2.service.d
+
+cat > "$AUTLOGIN_FILE" <<EOF
+# Managed by SvxLink-Touch
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $KIOSK_USER --noclear %I \$TERM
+EOF
+
+# Ensure the login shell invokes the kiosk integration.
+BASH_PROFILE="$KIOSK_HOME/.bash_profile"
+PROFILE_MARKER="# BEGIN SVXLINK-TOUCH"
+
+if [[ ! -f "$BASH_PROFILE" ]]; then
+    cat > "$BASH_PROFILE" <<'EOF'
+# Load the normal user profile.
+if [ -f "$HOME/.profile" ]; then
+    . "$HOME/.profile"
+fi
+EOF
+    chown "$KIOSK_USER:" "$BASH_PROFILE"
+fi
+
+if ! grep -Fq "$PROFILE_MARKER" "$BASH_PROFILE"; then
+    cat >> "$BASH_PROFILE" <<'EOF'
+
+# BEGIN SVXLINK-TOUCH
+if [ -f /usr/local/lib/svxlink-touch/profile.sh ]; then
+    . /usr/local/lib/svxlink-touch/profile.sh
+fi
+# END SVXLINK-TOUCH
+EOF
+fi
+
+log "Validating tty2 configuration..."
+systemd-analyze verify getty@tty2.service
+
+log "Reloading systemd configuration..."
+systemctl daemon-reload
+
+log "Kiosk files installed."
+log "Automatic startup will take effect at the next tty2 login."
+
+log "SvxLink-Touch V0.2 installation completed successfully."
+log "Kiosk startup configured for tty2."
+log "The graphical session will start at the next tty2 login."

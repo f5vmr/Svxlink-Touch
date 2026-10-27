@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+.AppleDouble
+._*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Development
+.vscode/
