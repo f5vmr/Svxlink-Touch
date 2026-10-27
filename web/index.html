@@ -235,6 +235,32 @@
             cursor: pointer;
         }
 
+        #talkgroup-available-list[hidden] {
+            display: none;
+        }
+
+        #talkgroup-confirmation[hidden] {
+            display: none;
+        }
+
+        .talkgroup-confirmation-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .talkgroup-confirmation-actions button {
+            flex: 1;
+            min-height: 48px;
+            padding: 8px;
+            border: 1px solid #426588;
+            border-radius: 8px;
+            background: #253f60;
+            color: #ffffff;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
         .node-list {
             display: flex;
             flex-direction: column;
@@ -376,6 +402,26 @@
 
                 <div id="talkgroup-available-list">
                     Loading available talkgroups...
+                </div>
+                <div id="talkgroup-confirmation" hidden>
+                    <h3 id="talkgroup-confirmation-name">—</h3>
+
+                    <div>
+                        Command:
+                        <strong id="talkgroup-confirmation-command">—</strong>
+                    </div>
+
+                    <div class="talkgroup-confirmation-actions">
+                        <button type="button" id="talkgroup-cancel">
+                            Cancel
+                        </button>
+
+                        <button type="button" id="talkgroup-confirm">
+                            Confirm
+                        </button>
+                    </div>
+
+                    <div id="talkgroup-confirmation-result"></div>
                 </div>
             </div>
 
@@ -533,8 +579,83 @@
     const talkgroupCard = document.getElementById("talkgroup-card");
     const talkgroupOverlay = document.getElementById("talkgroup-overlay");
     const talkgroupClose = document.getElementById("talkgroup-close");
+    const talkgroupAvailableList = document.getElementById(
+        "talkgroup-available-list"
+    );
+    const talkgroupConfirmation = document.getElementById(
+        "talkgroup-confirmation"
+    );
+    const talkgroupCancel = document.getElementById("talkgroup-cancel");
+    const talkgroupConfirm = document.getElementById("talkgroup-confirm");
 
-        async function openTalkgroupSelector() {
+    let pendingTalkgroup = null;
+
+    function prepareTalkgroupPreview(entry) {
+        const number = entry.number ?? entry.tg;
+
+        if (
+            !Number.isSafeInteger(number) ||
+            number <= 0
+        ) {
+            return;
+        }
+
+        pendingTalkgroup = {
+            nodeId: selectedNodeId,
+            name: entry.name,
+            number: number,
+            command: "91" + number + "#"
+        };
+
+        document.getElementById(
+            "talkgroup-confirmation-name"
+        ).textContent = entry.name + " — TG " + number;
+
+        document.getElementById(
+            "talkgroup-confirmation-command"
+        ).textContent = pendingTalkgroup.command;
+
+        document.getElementById(
+            "talkgroup-confirmation-result"
+        ).textContent = "Preview only — no DTMF will be transmitted.";
+
+        talkgroupAvailableList.hidden = true;
+        talkgroupConfirmation.hidden = false;
+    }
+
+    function cancelTalkgroupPreview() {
+        pendingTalkgroup = null;
+        talkgroupConfirmation.hidden = true;
+        talkgroupAvailableList.hidden = false;
+    }
+
+    function confirmTalkgroupPreview() {
+        if (
+            !pendingTalkgroup ||
+            pendingTalkgroup.nodeId !== selectedNodeId
+        ) {
+            cancelTalkgroupPreview();
+            return;
+        }
+
+        document.getElementById(
+            "talkgroup-confirmation-result"
+        ).textContent =
+            "Preview acknowledged — no DTMF transmitted.";
+
+        talkgroupConfirm.disabled = true;
+    }
+
+    talkgroupCancel.addEventListener("click", function () {
+        talkgroupConfirm.disabled = false;
+        cancelTalkgroupPreview();
+    });
+
+    talkgroupConfirm.addEventListener(
+        "click",
+        confirmTalkgroupPreview
+    );
+    async function openTalkgroupSelector() {
         const requestedNodeId = selectedNodeId;
         const availableList = document.getElementById(
             "talkgroup-available-list"
@@ -545,6 +666,11 @@
 
         document.getElementById("talkgroup-current").textContent =
             document.getElementById("node-talkgroup").textContent;
+
+        pendingTalkgroup = null;
+        talkgroupConfirmation.hidden = true;
+        talkgroupConfirm.disabled = false;
+        availableList.hidden = false;
 
         availableList.replaceChildren();
         availableList.textContent = "Loading available talkgroups...";
@@ -597,12 +723,17 @@
                 availableList.appendChild(heading);
 
                 for (const entry of entries) {
-                    const item = document.createElement("div");
+                    const item = document.createElement("button");
 
                     const number = entry.number ?? entry.tg;
 
+                    item.type = "button";
                     item.textContent =
                         entry.name + " — TG " + number;
+
+                    item.addEventListener("click", function () {
+                        prepareTalkgroupPreview(entry);
+                    });
 
                     availableList.appendChild(item);
                 }
@@ -623,6 +754,10 @@
     }
 
     function closeTalkgroupSelector() {
+        pendingTalkgroup = null;
+        talkgroupConfirmation.hidden = true;
+        talkgroupAvailableList.hidden = false;
+        talkgroupConfirm.disabled = false;
         talkgroupOverlay.hidden = true;
     }
 
