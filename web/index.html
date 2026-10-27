@@ -57,6 +57,8 @@
         /* Header */
 
         .status-header {
+            cursor: pointer;
+            touch-action: manipulation;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -164,6 +166,85 @@
             font-size: 13px;
             text-transform: uppercase;
         }
+        /* Node selection overlay */
+
+        .node-overlay[hidden] {
+            display: none;
+        }
+
+        .node-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.78);
+        }
+
+        .node-dialog {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 540px;
+            max-height: 100%;
+            padding: 20px;
+            border: 1px solid #426588;
+            border-radius: 14px;
+            background: #172a42;
+            color: #ffffff;
+        }
+
+        .node-dialog-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .node-dialog-header h2 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        #node-close {
+            min-height: 44px;
+            padding: 8px 20px;
+            border: 1px solid #426588;
+            border-radius: 8px;
+            background: #253f60;
+            color: #ffffff;
+            font-size: 17px;
+            cursor: pointer;
+        }
+
+        .node-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .node-list button {
+            min-height: 54px;
+            padding: 10px 16px;
+            border: 1px solid #426588;
+            border-radius: 8px;
+            background: #253f60;
+            color: #ffffff;
+            font-size: 20px;
+            text-align: left;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .node-list button.selected {
+            border-color: #68baff;
+            background: #215b87;
+        }
     </style>
 </head>
 
@@ -176,7 +257,11 @@
 
 <main id="main">
 
-    <header class="status-header">
+    <header class="status-header"
+            id="node-title-bar"
+            role="button"
+            tabindex="0"
+            aria-label="Select SvxLink node">
         <div>
             <div class="app-title">SVXLINK-TOUCH</div>
             <h1 id="node-callsign">Connecting...</h1>
@@ -226,6 +311,25 @@
 
 </main>
 
+    <!-- Node selection overlay -->
+    <div id="node-overlay" class="node-overlay" hidden>
+        <section class="node-dialog"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-labelledby="node-dialog-title">
+
+            <div class="node-dialog-header">
+                <h2 id="node-dialog-title">Select Node</h2>
+                <button type="button" id="node-close">Close</button>
+            </div>
+
+            <div id="node-list" class="node-list">
+                <!-- Available nodes inserted by JavaScript -->
+            </div>
+
+        </section>
+    </div>
+
 <script>
     // SvxLink-Touch inactivity timeout, in minutes.
     // Set to 0 to disable automatic return to the logo.
@@ -233,6 +337,147 @@
 
     const welcome = document.getElementById("welcome");
     const main = document.getElementById("main");
+
+    const nodeTitleBar = document.getElementById("node-title-bar");
+    const nodeOverlay = document.getElementById("node-overlay");
+    const nodeList = document.getElementById("node-list");
+    const nodeClose = document.getElementById("node-close");
+
+    // Selected node is established from the configured node list.
+    let selectedNodeId = null;
+    let selectedNodeName = "No node selected";
+
+        const LAST_NODE_KEY = "svxlink-touch-last-node";
+
+    async function initialiseNodeSelection() {
+        try {
+            const response = await fetch("/api/nodes", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("Unable to load configured nodes");
+            }
+
+            const result = await response.json();
+            const nodes = result.nodes || [];
+
+            const local = nodes.find(node => node.local === true);
+
+            if (local) {
+                const check = await fetch(
+                    "/api/node-status?id=" + encodeURIComponent(local.id),
+                    { cache: "no-store" }
+                ).catch(() => null);
+
+                if (check && check.ok) {
+                    selectedNodeId = local.id;
+                    selectedNodeName = local.name;
+                    return;
+                }
+            }
+
+            const previousId = localStorage.getItem(LAST_NODE_KEY);
+            const previous = nodes.find(node => node.id === previousId);
+
+            if (previous) {
+                selectedNodeId = previous.id;
+                selectedNodeName = previous.name;
+                return;
+            }
+
+            // First installation: prefer a remote node if local is unavailable.
+            const fallback = nodes.find(node => node.local !== true);
+
+            if (fallback) {
+                selectedNodeId = fallback.id;
+                selectedNodeName = fallback.name;
+            } else if (nodes.length > 0) {
+                selectedNodeId = nodes[0].id;
+                selectedNodeName = nodes[0].name;
+            }
+
+        } catch (error) {
+            console.error("Node selection initialisation failed:", error);
+        }
+    }
+
+    async function openNodeSelector() {
+        nodeOverlay.hidden = false;
+        nodeList.replaceChildren();
+
+        const message = document.createElement("div");
+        message.textContent = "Loading nodes...";
+        nodeList.appendChild(message);
+
+        try {
+            const response = await fetch("/api/nodes", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("Unable to retrieve configured nodes");
+            }
+
+            const result = await response.json();
+
+            nodeList.replaceChildren();
+
+            for (const node of result.nodes || []) {
+                const button = document.createElement("button");
+
+                button.type = "button";
+                button.textContent = node.name;
+                button.dataset.nodeId = node.id;
+
+                if (node.id === selectedNodeId) {
+                    button.classList.add("selected");
+                }
+
+                // Select the node and immediately refresh its status.
+                button.addEventListener("click", function () {
+                    selectedNodeId = node.id;
+                    selectedNodeName = node.name;
+
+                    localStorage.setItem(LAST_NODE_KEY, selectedNodeId);
+
+                    closeNodeSelector();
+
+                    document.getElementById("node-callsign").textContent =
+                        selectedNodeName + " — Connecting...";
+
+                    updateNodeStatus();
+                });
+
+                nodeList.appendChild(button);
+            }
+
+            if (!nodeList.children.length) {
+                message.textContent = "No configured nodes";
+                nodeList.appendChild(message);
+            }
+
+        } catch (error) {
+            nodeList.replaceChildren();
+            message.textContent = "Unable to load nodes";
+            nodeList.appendChild(message);
+        }
+    }
+
+    function closeNodeSelector() {
+        nodeOverlay.hidden = true;
+    }
+
+    nodeTitleBar.addEventListener("click", openNodeSelector);
+
+    nodeTitleBar.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openNodeSelector();
+        }
+    });
+
+    nodeClose.addEventListener("click", closeNodeSelector);
 
     let inactivityTimer = null;
     let currentPage = "welcome";
@@ -247,17 +492,35 @@
     }
 
 // Remote node status — initial V0.4 implementation.
+    let statusRequestId = 0;
+
     async function updateNodeStatus() {
+        const requestId = ++statusRequestId;
+        const nodeId = selectedNodeId;
+
+        if (nodeId === null) {
+            return;
+        }
+
         try {
-            const response = await fetch("/api/remote-status", {
-                cache: "no-store"
-            });
+            const response = await fetch(
+                "/api/node-status?id=" + encodeURIComponent(nodeId),
+                { cache: "no-store" }
+            );
+
+            if (requestId !== statusRequestId) {
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error("Remote node unavailable");
             }
 
             const result = await response.json();
+
+            if (requestId !== statusRequestId) {
+                return;
+            }
 
             if (!result.connected || !result.data?.status) {
                 throw new Error("Invalid remote node response");
@@ -293,7 +556,12 @@
                 status.active_talkgroup || "Standby";
 
         } catch (error) {
-            // Clear stale activity indicators if MB5HT becomes unreachable.
+            // Ignore errors from superseded status requests.
+            if (requestId !== statusRequestId) {
+                return;
+            }
+
+            // Clear stale activity indicators if the node becomes unreachable.
             document.querySelector(".receiver-card")
                 .classList.remove("active");
 
@@ -307,7 +575,7 @@
 
             // Reset displayed node information.
             document.getElementById("node-callsign").textContent =
-                "MB5HT — Offline";
+                selectedNodeName + " — Offline";
 
             document.getElementById("node-type").textContent = "—";
             document.getElementById("node-rx").textContent = "—";
@@ -320,11 +588,19 @@
     // Poll the remote node every five seconds.
     setInterval(updateNodeStatus, 5000);
 
-    function showMain() {
+    async function showMain() {
         welcome.style.display = "none";
         main.style.display = "grid";
         currentPage = "main";
-        updateNodeStatus();
+
+        if (selectedNodeId === null) {
+            await initialiseNodeSelection();
+        }
+
+        if (selectedNodeId !== null) {
+            updateNodeStatus();
+        }
+
         resetInactivityTimer();
     }
 
