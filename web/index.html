@@ -169,6 +169,22 @@
             background: #4a2028;
             color: #ff7777;
         }
+        .node-manage-button {
+            padding: 4px 12px;
+            min-height: 30px;
+            border: 1px solid #708090;
+            border-radius: 5px;
+            background: #344557;
+            color: white;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .node-manage-button:active {
+            background: #536d86;
+        }
         /* Footer */
 
         .status-footer {
@@ -360,6 +376,19 @@
             flex: 1;
             min-height: 42px;
         }
+        #node-management[hidden] {
+            display: none;
+        }
+
+        #node-management {
+            position: fixed;
+            inset: 0;
+            z-index: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.8);
+        }
         /* Remote node configuration overlay */
         #node-editor[hidden] {
             display: none;
@@ -500,6 +529,14 @@
             <span id="node-type">—</span>
         </div>
 
+        <button
+            type="button"
+            id="node-manage-button"
+            class="node-manage-button"
+        >
+            Nodes
+        </button>
+
         <div>SVXLINK-TOUCH V0.4</div>
     </footer>
 
@@ -572,6 +609,24 @@
             </div>
 
         </section>
+    </div>
+    <div id="node-management" hidden>
+        <div class="node-editor-panel">
+            <h2>Manage Remote Nodes</h2>
+
+            <div id="node-management-list" class="node-list">
+                Loading remote nodes...
+            </div>
+
+            <div class="node-editor-actions">
+                <button type="button" id="node-management-add">
+                    Add Remote Node
+                </button>
+                <button type="button" id="node-management-close">
+                    Close
+                </button>
+            </div>
+        </div>
     </div>
     <div id="node-editor" hidden>
         <div class="node-editor-panel">
@@ -764,32 +819,7 @@
                 });
 
                 nodeList.appendChild(button);
-
-                if (node.local !== true) {
-                    const editButton = document.createElement("button");
-
-                    editButton.type = "button";
-                    editButton.textContent = "Edit " + node.name;
-                    editButton.classList.add("node-edit-button");
-
-                    editButton.addEventListener("click", function () {
-                        openNodeEditor(node);
-                    });
-
-                    nodeList.appendChild(editButton);
-                }
             }
-
-            const addButton = document.createElement("button");
-            addButton.type = "button";
-            addButton.textContent = "+ Add Remote Node";
-            addButton.classList.add("node-add-button");
-
-            addButton.addEventListener("click", function () {
-                openNodeEditor();
-            });
-
-            nodeList.appendChild(addButton);
 
             if (!nodeList.children.length) {
                 message.textContent = "No configured nodes";
@@ -1442,6 +1472,77 @@
         nodeEditor.hidden = true;
     }
 
+    const nodeManagement = document.getElementById(
+        "node-management"
+    );
+
+    const nodeManagementList = document.getElementById(
+        "node-management-list"
+    );
+
+    async function openNodeManagement() {
+        nodeManagement.hidden = false;
+        nodeManagementList.textContent = "Loading remote nodes...";
+
+        try {
+            const response = await fetch("/api/nodes", {
+                cache: "no-store"
+            });
+
+            if (!response.ok) {
+                throw new Error("Unable to retrieve configured nodes");
+            }
+
+            const result = await response.json();
+
+            nodeManagementList.replaceChildren();
+
+            const remoteNodes = (result.nodes || []).filter(
+                node => node.local !== true
+            );
+
+            for (const node of remoteNodes) {
+                const button = document.createElement("button");
+
+                button.type = "button";
+                button.textContent = "Edit " + node.name;
+
+                button.addEventListener("click", function () {
+                    nodeManagement.hidden = true;
+                    openNodeEditor(node);
+                });
+
+                nodeManagementList.appendChild(button);
+            }
+
+            if (!remoteNodes.length) {
+                nodeManagementList.textContent =
+                    "No remote nodes configured.";
+            }
+
+        } catch (error) {
+            nodeManagementList.textContent =
+                "Unable to load remote nodes.";
+        }
+    }
+
+    document.getElementById(
+        "node-manage-button"
+    ).addEventListener("click", openNodeManagement);
+
+    document.getElementById(
+        "node-management-add"
+    ).addEventListener("click", function () {
+        nodeManagement.hidden = true;
+        openNodeEditor();
+    });
+
+    document.getElementById(
+        "node-management-close"
+    ).addEventListener("click", function () {
+        nodeManagement.hidden = true;
+    });
+
     function buildNodeEditorUrl() {
         const address = nodeEditorAddress.value.trim();
         const portText = nodeEditorPort.value.trim();
@@ -1587,7 +1688,7 @@
             );
 
             closeNodeEditor();
-            await openNodeSelector();
+            await openNodeManagement();
 
         } catch (error) {
             nodeEditorMessage("Save failed: " + error.message);
@@ -1665,7 +1766,7 @@
             }
 
             closeNodeEditor();
-            await openNodeSelector();
+            await openNodeManagement();
 
         } catch (error) {
             nodeEditorMessage(
