@@ -1436,8 +1436,10 @@
     const nodeEditorRemove = document.getElementById(
         "node-editor-remove"
     );
+    let nodeEditorProtocol = "http:";
     function openNodeEditor(node = null) {
         editingNodeId = node ? node.id : null;
+        nodeEditorProtocol = "http:";
         pendingNodeRemoval = false;
         nodeEditorRemove.textContent = "Remove";
         nodeEditorRemove.disabled = false;
@@ -1450,11 +1452,12 @@
         if (node && node.url) {
             try {
                 const parsed = new URL(node.url);
-                nodeEditorAddress.value =
-                    parsed.protocol + "//" + parsed.hostname;
+                nodeEditorProtocol = parsed.protocol;
+                nodeEditorAddress.value = parsed.hostname;
 
                 nodeEditorPort.value = parsed.port ||
                     (parsed.protocol === "https:" ? "443" : "5000");
+
             } catch (error) {
                 nodeEditorAddress.value = node.url;
             }
@@ -1544,7 +1547,7 @@
     });
 
     function buildNodeEditorUrl() {
-        const address = nodeEditorAddress.value.trim();
+        let address = nodeEditorAddress.value.trim();
         const portText = nodeEditorPort.value.trim();
 
         if (!address) {
@@ -1561,11 +1564,19 @@
             throw new Error("Port must be between 1 and 65535.");
         }
 
-        const supplied = address.includes("://")
-            ? address
-            : "http://" + address;
+        if (!address.includes("://")) {
+            address = nodeEditorProtocol + "//" + address;
+        }
 
-        const parsed = new URL(supplied);
+        let parsed;
+
+        try {
+            parsed = new URL(address);
+        } catch (error) {
+            throw new Error(
+                "Invalid address. Enter an IP address or hostname."
+            );
+        }
 
         if (!["http:", "https:"].includes(parsed.protocol)) {
             throw new Error("Only HTTP and HTTPS are supported.");
