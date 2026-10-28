@@ -250,8 +250,8 @@ def process_request(request, config):
 
     destination = discover_control_destination()
 
-    # Validate the actual SvxLink PTY before accepting
-    # this command preview. No DTMF is transmitted.
+    # Validate the actual SvxLink PTY before
+    # attempting authorised DTMF transmission.
     resolved_pty = validate_runtime_pty(
         destination["pty"]
     )

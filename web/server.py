@@ -5,6 +5,12 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 import socket
 import configparser
+import subprocess
+import re
+import ipaddress
+import http.client
+import ssl
+from urllib.parse import urlsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 from pathlib import Path
@@ -29,11 +35,19 @@ CONFIG_FILE = (
     if INSTALLED_CONFIG_FILE.is_file()
     else LEGACY_CONFIG_FILE
 )
-
+NODE_CONFIG_HELPER = Path(
+    "/usr/local/lib/svxlink-touch/svxlink_touch_node_config.py"
+)
 
 def load_nodes():
-    """Load the configured SvxLink nodes."""
-    with CONFIG_FILE.open("r", encoding="utf-8") as config_file:
+    """Load and normalise the currently configured SvxLink nodes."""
+    config_path = (
+        INSTALLED_CONFIG_FILE
+        if INSTALLED_CONFIG_FILE.is_file()
+        else LEGACY_CONFIG_FILE
+    )
+
+    with config_path.open("r", encoding="utf-8") as config_file:
         config = json.load(config_file)
 
     if config.get("schema_version") != 1:
@@ -44,12 +58,70 @@ def load_nodes():
     if not isinstance(nodes, list):
         raise ValueError("Node configuration must contain a nodes list")
 
-    return [
-        node for node in nodes
-        if isinstance(node, dict) and node.get("enabled") is True
-    ]
+    enabled_nodes = []
+
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+
+        if node.get("enabled") is not True:
+            continue
+
+        entry = node.copy()
+        entry["url"] = normalise_node_url(entry["url"])
+        enabled_nodes.append(entry)
+
+    return enabled_nodes
 # Initial remote node for V0.4 testing.
 REMOTE_NODE_URL = "http://192.168.1.214:5000/api/status"
+
+
+
+def normalise_node_url(address):
+    """Validate and normalise a configured node address."""
+    from urllib.parse import urlsplit
+
+    if not isinstance(address, str) or not address.strip():
+        raise ValueError("Node address is required")
+
+    address = address.strip()
+
+    if "://" not in address:
+        address = "http://" + address
+
+    parsed = urlsplit(address)
+
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError("Unsupported node address scheme")
+
+    if (
+        not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("Invalid node address")
+
+    try:
+        port = parsed.port
+    except ValueError as error:
+        raise ValueError("Invalid node port") from error
+
+    if port is None:
+        port = 443 if parsed.scheme == "https" else 5000
+
+    if not 1 <= port <= 65535:
+        raise ValueError("Invalid node port")
+
+    hostname = parsed.hostname
+
+    if ":" in hostname:
+        hostname = f"[{hostname}]"
+
+    return f"{parsed.scheme}://{hostname}:{port}"
+
 
 
 def load_talkgroup_favourites():
@@ -167,6 +239,92 @@ def load_monitored_talkgroups():
         })
 
     return monitored
+
+
+class NoRedirectHandler(HTTPRedirectHandler):
+    """Prevent connection tests from following redirects."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def validate_remote_host(hostname):
+    """Reject unsuitable destinations while permitting remote networks."""
+    import socket
+
+    if not hostname or hostname.lower() == "localhost":
+        raise ValueError("Invalid remote hostname")
+
+    addresses = socket.getaddrinfo(
+        hostname, None, type=socket.SOCK_STREAM
+    )
+
+    if not addresses:
+        raise ValueError("Remote hostname could not be resolved")
+
+    for entry in addresses:
+        address = ipaddress.ip_address(entry[4][0])
+
+        if (
+            address.is_loopback
+            or address.is_link_local
+            or address.is_unspecified
+            or address.is_multicast
+        ):
+            raise ValueError(
+                "Remote address is not permitted"
+            )
+
+
+class ValidatedHTTPConnection(http.client.HTTPConnection):
+    """Connect only to an address already validated."""
+
+    def connect(self):
+        addresses = socket.getaddrinfo(
+            self.host,
+            self.port,
+            type=socket.SOCK_STREAM,
+        )
+
+        permitted = []
+
+        for family, socktype, proto, _, sockaddr in addresses:
+            address = ipaddress.ip_address(sockaddr[0])
+
+            if (
+                address.is_loopback
+                or address.is_link_local
+                or address.is_unspecified
+                or address.is_multicast
+            ):
+                continue
+
+            permitted.append(
+                (family, socktype, proto, sockaddr)
+            )
+
+        if not permitted:
+            raise ValueError("No permitted remote addresses")
+
+        family, socktype, proto, sockaddr = permitted[0]
+
+        self.sock = socket.socket(family, socktype, proto)
+        self.sock.settimeout(self.timeout)
+        self.sock.connect(sockaddr)
+
+
+class ValidatedHTTPSConnection(ValidatedHTTPConnection):
+    """Use a validated address with TLS hostname verification."""
+
+    def connect(self):
+        super().connect()
+
+        context = ssl.create_default_context()
+
+        self.sock = context.wrap_socket(
+            self.sock,
+            server_hostname=self.host,
+        )
 
 
 class TouchHandler(SimpleHTTPRequestHandler):
@@ -453,6 +611,222 @@ class TouchHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(result)
 
+    def handle_node_config(self):
+        """Process a restricted remote-node configuration request."""
+        status_code = 400
+
+        try:
+            if self.headers.get("Origin") != "http://127.0.0.1:8080":
+                raise ValueError(
+                    "Configuration requires the local touchscreen"
+                )
+
+            content_type = self.headers.get(
+                "Content-Type", ""
+            ).split(";", 1)[0].strip().lower()
+
+            if content_type != "application/json":
+                raise ValueError("JSON content required")
+
+            content_length = int(
+                self.headers.get("Content-Length", "0")
+            )
+
+            if not 0 < content_length <= 4096:
+                raise ValueError("Invalid request length")
+
+            request = json.loads(
+                self.rfile.read(content_length)
+            )
+
+            if not isinstance(request, dict):
+                raise ValueError("Invalid configuration request")
+
+            operation = request.get("operation")
+
+            if operation not in ("add", "edit", "remove"):
+                raise ValueError("Unsupported configuration operation")
+
+            if operation in ("add", "edit"):
+                if set(request) != {
+                    "operation", "id", "name", "url"
+                }:
+                    raise ValueError("Invalid configuration fields")
+
+            elif set(request) != {"operation", "id"}:
+                raise ValueError("Invalid removal request")
+
+            result = subprocess.run(
+                [
+                    "/usr/bin/sudo",
+                    "-n",
+                    "/usr/bin/python3",
+                    str(NODE_CONFIG_HELPER),
+                ],
+                input=json.dumps(request),
+                text=True,
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
+
+            try:
+                payload = json.loads(result.stdout)
+            except json.JSONDecodeError:
+                raise ValueError(
+                    "Node configuration helper failed"
+                )
+
+            if not isinstance(payload, dict):
+                raise ValueError(
+                    "Invalid node configuration response"
+                )
+
+            status_code = (
+                200
+                if result.returncode == 0
+                and payload.get("success") is True
+                else 400
+            )
+
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            subprocess.TimeoutExpired,
+        ) as error:
+            status_code = 400
+            payload = {
+                "success": False,
+                "error": str(error),
+            }
+
+        result = json.dumps(payload).encode("utf-8")
+
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(result)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(result)
+
+    def handle_node_test(self):
+        """Test a remote SvxLink Dashboard status endpoint."""
+        from urllib.parse import urlsplit
+        import ipaddress
+
+        status_code = 400
+
+        try:
+            if self.headers.get("Origin") != "http://127.0.0.1:8080":
+                raise ValueError(
+                    "Connection tests require the local touchscreen"
+                )
+
+            content_type = self.headers.get(
+                "Content-Type", ""
+            ).split(";", 1)[0].strip().lower()
+
+            if content_type != "application/json":
+                raise ValueError("JSON content required")
+
+            content_length = int(
+                self.headers.get("Content-Length", "0")
+            )
+
+            if not 0 < content_length <= 4096:
+                raise ValueError("Invalid request length")
+
+            request = json.loads(
+                self.rfile.read(content_length)
+            )
+
+            if (
+                not isinstance(request, dict)
+                or set(request) != {"url"}
+            ):
+                raise ValueError("Invalid connection test request")
+
+            url = normalise_node_url(request["url"])
+            parsed = urlsplit(url)
+
+            validate_remote_host(parsed.hostname)
+
+            endpoint = url.rstrip("/") + "/api/status"
+
+            connection_class = (
+                ValidatedHTTPSConnection
+                if parsed.scheme == "https"
+                else ValidatedHTTPConnection
+            )
+
+            connection = connection_class(
+                parsed.hostname,
+                parsed.port,
+                timeout=5,
+            )
+
+            try:
+                connection.request(
+                    "GET",
+                    "/api/status",
+                    headers={"Accept": "application/json"},
+                )
+
+                response = connection.getresponse()
+
+                if response.status != 200:
+                    raise ValueError(
+                        "Remote Dashboard did not return HTTP 200"
+                    )
+
+                content = response.read(65537)
+
+                if len(content) > 65536:
+                    raise ValueError(
+                        "Remote status response is too large"
+                    )
+
+                data = json.loads(content)
+
+            finally:
+                connection.close()
+
+            if not isinstance(data, dict):
+                raise ValueError("Invalid SvxLink status response")
+
+            payload = {
+                "success": True,
+                "url": url,
+                "message": "SvxLink status endpoint responded",
+            }
+            status_code = 200
+
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            HTTPError,
+            URLError,
+            TimeoutError,
+        ) as error:
+            payload = {
+                "success": False,
+                "error": str(error),
+            }
+            status_code = 400
+
+        result = json.dumps(payload).encode("utf-8")
+
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(result)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(result)
+
     def do_POST(self):
         """Route supported touchscreen control requests."""
         from urllib.parse import urlsplit
@@ -461,6 +835,14 @@ class TouchHandler(SimpleHTTPRequestHandler):
 
         if request_path == "/api/talkgroup-control":
             self.handle_talkgroup_control()
+            return
+
+        if request_path == "/api/node-config":
+            self.handle_node_config()
+            return
+
+        if request_path == "/api/node-test":
+            self.handle_node_test()
             return
 
         self.send_error(404, "Unknown control endpoint")

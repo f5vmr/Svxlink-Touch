@@ -1,0 +1,4 @@
+# SvxLink-Touch restricted remote-node configuration
+# Permit only the dedicated node configuration helper.
+
+@SVXLINK_TOUCH_USER@ ALL=(root) NOPASSWD: /usr/bin/python3 /usr/local/lib/svxlink-touch/svxlink_touch_node_config.py

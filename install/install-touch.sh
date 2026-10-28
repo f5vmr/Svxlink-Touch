@@ -235,6 +235,34 @@ sed -i \
   -e "s|@SVXLINK_TOUCH_DIR@|$PROJECT_DIR|g" \
   /etc/systemd/system/svxlink-touch-web.service
 
+log "Installing protected SvxLink-Touch node configuration helper..."
+
+install -d -o root -g root -m 0755 \
+    /usr/local/lib/svxlink-touch
+
+install -o root -g root -m 0755 \
+    "$PROJECT_DIR/control/svxlink_touch_node_config.py" \
+    /usr/local/lib/svxlink-touch/svxlink_touch_node_config.py
+
+log "Installing restricted SvxLink-Touch node configuration permissions..."
+
+NODE_CONFIG_SUDOERS="/etc/sudoers.d/svxlink-touch-node-config"
+
+install -o root -g root -m 0440 \
+    "$PROJECT_DIR/install/svxlink-touch-node-config.sudoers" \
+    "$NODE_CONFIG_SUDOERS"
+
+sed -i \
+    -e "s|@SVXLINK_TOUCH_USER@|$KIOSK_USER|g" \
+    -e "s|@SVXLINK_TOUCH_DIR@|$PROJECT_DIR|g" \
+    "$NODE_CONFIG_SUDOERS"
+
+if ! visudo -cf "$NODE_CONFIG_SUDOERS"; then
+    rm -f "$NODE_CONFIG_SUDOERS"
+    log "Invalid node configuration sudoers rule."
+    exit 1
+fi
+
 log "Reloading systemd configuration..."
 systemctl daemon-reload
 
