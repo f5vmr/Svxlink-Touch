@@ -241,13 +241,6 @@ def load_monitored_talkgroups():
     return monitored
 
 
-class NoRedirectHandler(HTTPRedirectHandler):
-    """Prevent connection tests from following redirects."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
-
-
 def validate_remote_host(hostname):
     """Reject unsuitable destinations while permitting remote networks."""
     import socket
