@@ -397,7 +397,7 @@ class TouchHandler(SimpleHTTPRequestHandler):
         self.wfile.write(result)
 
     def handle_talkgroups(self):
-        """Return monitored talkgroups for a configured local node."""
+        """Return shared favourites and locally monitored talkgroups."""
         from urllib.parse import parse_qs, urlsplit
 
         query = parse_qs(urlsplit(self.path).query)
@@ -418,18 +418,14 @@ class TouchHandler(SimpleHTTPRequestHandler):
                 }
                 status_code = 404
 
-            elif node.get("local") is not True:
-                payload = {
-                    "available": False,
-                    "node_id": node_id,
-                    "talkgroups": [],
-                    "error": "Remote talkgroup discovery is not yet available",
-                }
-                status_code = 200
-
             else:
-                monitored = load_monitored_talkgroups()
                 favourites = load_talkgroup_favourites()
+
+                monitored = (
+                    load_monitored_talkgroups()
+                    if node.get("local") is True
+                    else []
+                )
 
                 payload = {
                     "available": True,
