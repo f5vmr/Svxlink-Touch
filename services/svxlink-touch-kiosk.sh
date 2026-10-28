@@ -25,5 +25,6 @@ exec /usr/bin/cage -s -- /usr/bin/chromium \
     --ozone-platform=wayland \
     --no-first-run \
     --no-default-browser-check \
+    --disk-cache-size=0 \
     --kiosk \
     "$URL"

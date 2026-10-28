@@ -250,7 +250,16 @@ systemctl enable getty@tty2.service
 log "Enabling automatic console selection..."
 systemctl enable svxlink-touch-console.service
 
+log "Starting SvxLink-Touch web interface..."
+systemctl restart svxlink-touch-web.service
+
+log "Starting SvxLink-Touch DTMF control socket..."
+systemctl restart svxlink-touch-control.socket
+
+log "Initialising SvxLink-Touch kiosk..."
+systemctl restart getty@tty2.service
+
 log "SvxLink-Touch V0.3 installation completed successfully."
 log "Web interface configured on http://127.0.0.1:8080/"
 log "Kiosk startup configured for tty2."
-log "Automatic startup will take effect on the next boot."
+log "Touchscreen initialised; automatic startup remains enabled."
