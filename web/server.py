@@ -820,6 +820,125 @@ class TouchHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(result)
 
+    def handle_talkgroup_favourites(self):
+        """Manage locally stored talkgroup favourites."""
+        status_code = 400
+
+        try:
+            if self.headers.get("Origin") != "http://127.0.0.1:8080":
+                raise ValueError(
+                    "Configuration requires the local touchscreen"
+                )
+
+            content_type = self.headers.get(
+                "Content-Type", ""
+            ).split(";", 1)[0].strip().lower()
+
+            if content_type != "application/json":
+                raise ValueError("JSON content required")
+
+            content_length = int(
+                self.headers.get("Content-Length", "0")
+            )
+
+            if not 0 < content_length <= 4096:
+                raise ValueError("Invalid request length")
+
+            request = json.loads(
+                self.rfile.read(content_length)
+            )
+
+            if not isinstance(request, dict):
+                raise ValueError("Invalid talkgroup request")
+
+            operation = request.get("operation")
+
+            required = (
+                {"operation", "number", "original_number"}
+                if operation == "edit"
+                else {"operation", "number"}
+            )
+
+            if (
+                operation not in ("add", "edit", "remove")
+                or set(request) != required
+            ):
+                raise ValueError("Invalid talkgroup operation")
+
+            number = request["number"]
+
+            if (
+                type(number) is not int
+                or not 0 < number <= 99999999
+            ):
+                raise ValueError("Invalid talkgroup number")
+
+            if operation == "edit":
+                original = request["original_number"]
+
+                if (
+                    type(original) is not int
+                    or not 0 < original <= 99999999
+                ):
+                    raise ValueError("Invalid original talkgroup")
+
+            helper_request = {
+                "resource": "talkgroups",
+                **request,
+            }
+
+            completed = subprocess.run(
+                [
+                    "/usr/bin/sudo",
+                    "-n",
+                    "/usr/bin/python3",
+                    str(NODE_CONFIG_HELPER),
+                ],
+                input=json.dumps(helper_request),
+                text=True,
+                capture_output=True,
+                timeout=10,
+                check=False,
+            )
+
+            try:
+                payload = json.loads(completed.stdout)
+            except json.JSONDecodeError:
+                raise ValueError(
+                    "Talkgroup configuration helper failed"
+                )
+
+            if not isinstance(payload, dict):
+                raise ValueError("Invalid helper response")
+
+            status_code = (
+                200
+                if completed.returncode == 0
+                and payload.get("success") is True
+                else 400
+            )
+
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            subprocess.TimeoutExpired,
+        ) as error:
+            payload = {
+                "success": False,
+                "error": str(error),
+            }
+
+        result = json.dumps(payload).encode("utf-8")
+
+        self.send_response(status_code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(result)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(result)
+
     def do_POST(self):
         """Route supported touchscreen control requests."""
         from urllib.parse import urlsplit
@@ -832,6 +951,10 @@ class TouchHandler(SimpleHTTPRequestHandler):
 
         if request_path == "/api/node-config":
             self.handle_node_config()
+            return
+
+        if request_path == "/api/talkgroup-favourites":
+            self.handle_talkgroup_favourites()
             return
 
         if request_path == "/api/node-test":

@@ -193,7 +193,127 @@ def modify_config(request):
     }
 
 
+TALKGROUP_FILE = Path(
+    "/var/lib/svxlink-touch/talkgroups.json"
+)
+
+
+def modify_talkgroup_favourites(request):
+    """Add, edit or remove a locally stored talkgroup favourite."""
+    if not isinstance(request, dict):
+        raise ValueError("Invalid talkgroup request")
+
+    operation = request.get("operation")
+
+    if operation not in ("add", "edit", "remove"):
+        raise ValueError("Unsupported talkgroup operation")
+
+    required = (
+        {"operation", "number", "original_number"}
+        if operation == "edit"
+        else {"operation", "number"}
+    )
+
+    if set(request) != required:
+        raise ValueError("Invalid talkgroup request fields")
+
+    number = request["number"]
+
+    if type(number) is not int or not 0 < number <= 99999999:
+        raise ValueError("Invalid talkgroup number")
+
+    with TALKGROUP_FILE.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+
+    if (
+        not isinstance(data, dict)
+        or not isinstance(data.get("favorites"), list)
+    ):
+        raise ValueError("Invalid talkgroup favourites database")
+
+    favourites = data["favorites"]
+
+    if operation == "add":
+        if any(
+            entry.get("number") == number
+            for entry in favourites
+        ):
+            raise ValueError("Talkgroup already exists")
+
+        favourites.append({
+            "name": str(number),
+            "number": number,
+        })
+
+    elif operation == "edit":
+        original = request["original_number"]
+
+        if type(original) is not int or original <= 0:
+            raise ValueError("Invalid original talkgroup number")
+
+        matching = [
+            entry for entry in favourites
+            if entry.get("number") == original
+        ]
+
+        if len(matching) != 1:
+            raise ValueError("Original talkgroup not found")
+
+        if number != original and any(
+            entry.get("number") == number
+            for entry in favourites
+        ):
+            raise ValueError("Talkgroup already exists")
+
+        matching[0]["number"] = number
+        matching[0]["name"] = str(number)
+
+    else:
+        matching = [
+            entry for entry in favourites
+            if entry.get("number") == number
+        ]
+
+        if len(matching) != 1:
+            raise ValueError("Talkgroup not found")
+
+        favourites.remove(matching[0])
+
+    temporary_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=TALKGROUP_FILE.parent,
+            prefix=".talkgroups-",
+            suffix=".json",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+
+            json.dump(data, handle, indent=4)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+
+        os.chmod(temporary_path, 0o644)
+        os.chown(temporary_path, 0, 0)
+        os.replace(temporary_path, TALKGROUP_FILE)
+
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+    return {
+        "success": True,
+        "operation": operation,
+        "number": number,
+    }
+
+
 def main():
+    """Process a restricted node or talkgroup configuration request."""
     if len(sys.argv) != 1:
         raise ValueError("Command-line arguments are not accepted")
 
@@ -201,7 +321,22 @@ def main():
         raise PermissionError("Root privileges required")
 
     request = json.load(sys.stdin)
-    result = modify_config(request)
+
+    if not isinstance(request, dict):
+        raise ValueError("Invalid configuration request")
+
+    if request.get("resource") == "talkgroups":
+        if "resource" not in request:
+            raise ValueError("Invalid talkgroup resource")
+
+        talkgroup_request = request.copy()
+        del talkgroup_request["resource"]
+
+        result = modify_talkgroup_favourites(talkgroup_request)
+
+    else:
+        result = modify_config(request)
+
     print(json.dumps(result))
 
 
