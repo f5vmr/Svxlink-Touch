@@ -29,9 +29,13 @@ fi
 # shellcheck disable=SC1091
 source /etc/os-release
 
-if [[ "${VERSION_CODENAME:-}" != "trixie" ]]; then
-    fail "This installer currently supports Debian Trixie only."
-fi
+case "${VERSION_CODENAME:-}" in
+    bookworm|trixie)
+        ;;
+    *)
+        fail "Unsupported Debian release."
+        ;;
+esac
 
 ARCH="$(dpkg --print-architecture)"
 
