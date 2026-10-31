@@ -72,7 +72,9 @@ log "Checking display modes..."
 
 FOUND_MODE=0
 
-for MODE_FILE in /sys/class/drm/card*-DSI-*/modes; do
+for MODE_FILE in \
+    /sys/class/drm/card*-DSI-*/modes \
+    /sys/class/drm/card*-SPI-*/modes; do
     if [[ -f "$MODE_FILE" ]]; then
         log "$MODE_FILE:"
         cat "$MODE_FILE"
