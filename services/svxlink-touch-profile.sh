@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 #
 # SvxLink-Touch tty2 startup integration
